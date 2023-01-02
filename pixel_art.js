@@ -278,3 +278,62 @@ function pictureFromImage(image) {
     }
     return new Picture(width, height, pixels);
 }
+
+function historyUpdateState(state, action) {
+    if (action.undo == true) {
+        if (state.done.length == 0) return state;
+        return Object.assign({}, state, {
+            picture: state.done[0],
+            done: state.done.slice(1),
+            doneAt: 0
+        });
+    } else if (action.picture &&
+                state.doneAt < Date.now() - 1000) {
+    return Object.assign({}, state, action, {
+        done: [state.picture, ...state.done],
+        doneAt: Date.now()
+        });
+    } else {
+        return Object.assign({}, state, action);
+    }
+}
+
+var UndoButton = class UndoButton {
+    constructor(state, {dispatch}) {
+        this.dom = elt("button" , {
+            onclick: () => dispatch({undo: true}),
+            disabled: state.done.length == 0
+        }, "⮪ Undo");
+    }
+    syncState(state) {
+        this.dom.disabled = state.done.length == 0;
+    }
+}
+
+var startState = {
+    tool: "draw",
+    color: "#000000",
+    picture: Picture.empty(60, 30, "#f0f0f0"),
+    done: [],
+    doneAt: 0
+};
+
+var baseTools = {draw, fill, rectangle, pick};
+
+var baseControls = [
+    ToolSelect, ColorSelect, SaveButton, LoadButton, UndoButton
+];
+
+function startPixelEditor({ state = startState,
+                            tools = baseTools,
+                            controls = baseControls}) {
+    let app = new PixelEditor(state, {
+        tools,
+        controls,
+        dispatch(action) {
+            state = historyUpdateState(state, action);
+            app.syncState(state);
+        }
+    });
+    return app.dom;
+}
